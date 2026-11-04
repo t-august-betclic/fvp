@@ -96,28 +96,18 @@ private:
     mutex mtx;
 };
 
-template<typename T>
-auto View_GetGraphicsAdapter(T* v) -> decltype(v->GetGraphicsAdapter())
-{
-    return v->GetGraphicsAdapter();
-}
-
-template<typename T>
-IDXGIAdapter* View_GetGraphicsAdapter(T v) {
-    return nullptr;
-}
-
 // static
 void FvpPlugin::RegisterWithRegistrar(
     flutter::PluginRegistrarWindows *registrar) {
-  IDXGIAdapter *adapter = View_GetGraphicsAdapter(registrar->GetView());
-  if (!adapter)
-    clog << "FlutterView::GetGraphicsAdapter() is not available, texture may be invisible" << endl;
+  // Asked of the registrar, not of the implicit view: a headless engine has no implicit view.
+  ComPtr<IDXGIAdapter> adapter;
+  if (!registrar->GetGraphicsAdapter(&adapter))
+    clog << "PluginRegistrarWindows::GetGraphicsAdapter() failed, texture may be invisible" << endl;
   auto channel =
       std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
           registrar->messenger(), "fvp",
           &flutter::StandardMethodCodec::GetInstance());
-  auto plugin = std::make_unique<FvpPlugin>(registrar->texture_registrar(), adapter);
+  auto plugin = std::make_unique<FvpPlugin>(registrar->texture_registrar(), adapter.Get());
 
   channel->SetMethodCallHandler(
       [plugin_pointer = plugin.get()](const auto &call, auto result) {
